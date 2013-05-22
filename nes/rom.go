@@ -8,7 +8,7 @@ import (
 
 type Rom struct {
     romBankCnt uint8
-    romBanks [][]byte
+    RomBanks [][]byte
     vromBankCnt uint8
     vromBanks [][]byte
     flags1 byte
@@ -48,12 +48,15 @@ func (r *Rom) Init(infile string) error {
     r.isPal = uint8(file[9])
 
     // Allocate and fill ROM banks
-    r.romBanks = make([][]byte, r.romBankCnt)
-    for i := range r.romBanks {
+    r.RomBanks = make([][]byte, r.romBankCnt)
+    for i := range r.RomBanks {
         offset := 0x10 + i * 0x4000
         bank := make([]byte, 0x4000)
         copy(bank, file[offset:offset + 0x4000])
-        r.romBanks[i] = bank
+        r.RomBanks[i] = bank
+
+        // Initialize RAM
+        copy(Ram[0x8000+i*0x4000:], bank)
     }
 
     // Allocate and fille VROM banks

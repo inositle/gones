@@ -34,4 +34,11 @@ func main() {
         return
 	}
     log.Println(rom)
+
+    pc := uint16(0x8000)
+    var b byte
+    for {
+        b = nes.Ram[pc]
+        pc = nes.Disassemble(b, &cpu, pc)
+    }
 }
