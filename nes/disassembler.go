@@ -23,7 +23,9 @@ func relativeAddress(pc uint16) (result int8) {
     return int8(immediateAddress(pc))
 }
 
-func Disassemble(opcode byte, cpu *Cpu, pc uint16) (new_pc uint16) {
+func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
+    pc := cpu.r.pc
+    opcode, _ := Ram.Read(pc)
 	new_pc = pc + 1
 
     out := fmt.Sprintf("%04x: %02x  ", pc, opcode)
@@ -90,6 +92,9 @@ func Disassemble(opcode byte, cpu *Cpu, pc uint16) (new_pc uint16) {
 	}
 
     fmt.Printf(out)
+    if update {
+        cpu.r.pc = new_pc
+    }
 
 	return
 }

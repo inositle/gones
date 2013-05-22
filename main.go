@@ -2,21 +2,22 @@ package main
 
 import (
 	"flag"
+	"github.com/inositle/gones/nes"
 	"log"
-    "github.com/inositle/gones/nes"
 )
 
-
 var (
-    infile string
+	infile  string
+	bDisasm bool
 
-    rom nes.Rom
-    cpu nes.Cpu
-    apu nes.Apu
+	rom nes.Rom
+	cpu nes.Cpu
+	apu nes.Apu
 )
 
 func init() {
 	flag.StringVar(&infile, "r", "", "Rom to emulate")
+	flag.BoolVar(&bDisasm, "d", false, "Disassemble instead of execute")
 }
 
 func main() {
@@ -25,20 +26,24 @@ func main() {
 		log.Fatal("ROM file required!")
 	}
 
-    // Initialize hardware
-    cpu.Init()
+	// Initialize hardware
+	cpu.Init()
 
-    // Load in ROM
-    if err := rom.Init(infile); err != nil {
+	// Load in ROM
+	if err := rom.Init(infile); err != nil {
 		log.Fatal("Error loading ROM. ", err)
-        return
+		return
 	}
-    log.Println(rom)
+	log.Println(rom)
 
-    pc := uint16(0x8000)
-    var b byte
-    for {
-        b = nes.Ram[pc]
-        pc = nes.Disassemble(b, &cpu, pc)
+	if bDisasm {
+		for {
+            nes.Disassemble(&cpu, true)
+		}
+	} else {
+        for {
+            nes.Disassemble(&cpu, false)
+            cpu.Step()
+        }
     }
 }
