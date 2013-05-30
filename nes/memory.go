@@ -17,7 +17,7 @@ func (m *Memory) Init() {
 }
 
 func (m *Memory) Read(addr uint16) (b byte, err error) {
-    if addr >= 0x8000 && addr <= 0xffff {
+    if addr >= 0x0 && addr <= 0xffff {
         b = m[addr]
     } else {
         err = MemoryError{ErrorText:"Unimplemented memory access!"}
@@ -26,7 +26,7 @@ func (m *Memory) Read(addr uint16) (b byte, err error) {
 }
 
 func (m *Memory) Write(addr uint16, b byte) (err error) {
-    if addr >= 0x8000 && addr <= 0xffff {
+    if addr >= 0x0 && addr <= 0xffff {
         m[addr] = b
     } else {
         err = MemoryError{ErrorText:"Unimplemented memory access!"}

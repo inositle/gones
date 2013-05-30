@@ -13,6 +13,12 @@ func absoluteAddress(pc uint16) (result uint16) {
 	return
 }
 
+func zeroPageAddress(pc uint16) (result uint16) {
+    tmp, _ := Ram.Read(pc)
+    result = uint16(tmp)
+	return
+}
+
 func immediateAddress(pc uint16) (result uint8) {
 	buf := bytes.NewBuffer(Ram[pc : pc+1])
 	binary.Read(buf, binary.LittleEndian, &result)
@@ -38,16 +44,35 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
     case 0x10:
         out += fmt.Sprintf("BPL $%02x\n", relativeAddress(pc+1))
         new_pc += 1
+    case 0x18:
+        out += fmt.Sprintf("CLC\n")
     case 0x20:
         out += fmt.Sprintf("JSR $%04x\n", absoluteAddress(pc+1))
         new_pc += 2
+    case 0x24:
+        out += fmt.Sprintf("BIT $%04x\n", zeroPageAddress(pc+1))
+        new_pc += 1
+    case 0x38:
+        out += fmt.Sprintf("SEC\n")
 	case 0x4c:
 		out += fmt.Sprintf("JMP $%04x\n", absoluteAddress(pc+1))
 		new_pc += 2
+    case 0x50:
+        out += fmt.Sprintf("BVC $%02x\n", relativeAddress(pc+1))
+        new_pc += 1
 	case 0x60:
 		out += fmt.Sprintf("RTS\n")
+    case 0x70:
+        out += fmt.Sprintf("BVS $%02x\n", relativeAddress(pc+1))
+        new_pc += 1
 	case 0x78:
 		out += fmt.Sprintf("SEI\n")
+    case 0x85:
+        out += fmt.Sprintf("STA $%04x\n", zeroPageAddress(pc+1))
+        new_pc += 1
+    case 0x86:
+        out += fmt.Sprintf("STX $%04x\n", zeroPageAddress(pc+1))
+        new_pc += 1
     case 0x8d:
         out += fmt.Sprintf("STA [$%04x]\n", absoluteAddress(pc+1))
         new_pc += 2
@@ -84,9 +109,14 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
         new_pc += 1
 	case 0xd8:
 		out += fmt.Sprintf("CLD\n")
+    case 0xea:
+        out += fmt.Sprintf("NOP\n")
     case 0xee:
         out += fmt.Sprintf("INC [$%04x]\n", absoluteAddress(pc+1))
         new_pc += 2
+    case 0xf0:
+        out += fmt.Sprintf("BEQ $%02x\n", relativeAddress(pc+1))
+        new_pc += 1
 	default:
 		out += fmt.Sprintf("Unknown: 0x%02x\n", opcode)
 	}
