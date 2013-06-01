@@ -38,6 +38,8 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
 	switch opcode {
     case 0x00:
         out += fmt.Sprintf("BRK\n")
+    case 0x08:
+        out += fmt.Sprintf("PHP\n")
     case 0x09:
         out += fmt.Sprintf("ORA #%02x\n", immediateAddress(pc+1))
         new_pc += 1
@@ -52,8 +54,21 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
     case 0x24:
         out += fmt.Sprintf("BIT $%04x\n", zeroPageAddress(pc+1))
         new_pc += 1
+    case 0x28:
+        out += fmt.Sprintf("PLP\n")
+    case 0x29:
+        out += fmt.Sprintf("AND $%02x\n", immediateAddress(pc+1))
+        new_pc += 1
+    case 0x30:
+        out += fmt.Sprintf("BMI $%02x\n", relativeAddress(pc+1))
+        new_pc += 1
     case 0x38:
         out += fmt.Sprintf("SEC\n")
+    case 0x48:
+        out += fmt.Sprintf("PHA\n")
+    case 0x49:
+        out += fmt.Sprintf("EOR $%02x\n", immediateAddress(pc+1))
+        new_pc += 1
 	case 0x4c:
 		out += fmt.Sprintf("JMP $%04x\n", absoluteAddress(pc+1))
 		new_pc += 2
@@ -62,6 +77,11 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
         new_pc += 1
 	case 0x60:
 		out += fmt.Sprintf("RTS\n")
+    case 0x68:
+        out += fmt.Sprintf("PLA\n")
+    case 0x69:
+        out += fmt.Sprintf("ADC $%02x\n", immediateAddress(pc+1))
+        new_pc += 1
     case 0x70:
         out += fmt.Sprintf("BVS $%02x\n", relativeAddress(pc+1))
         new_pc += 1
@@ -96,6 +116,8 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
     case 0xb0:
         out += fmt.Sprintf("BCS $%02x\n", relativeAddress(pc+1))
         new_pc += 1
+    case 0xb8:
+        out += fmt.Sprintf("CLV\n")
     case 0xbd:
         out += fmt.Sprintf("LDA [$%04x + X]\n", absoluteAddress(pc+1))
         new_pc += 2
@@ -109,6 +131,9 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
         new_pc += 1
 	case 0xd8:
 		out += fmt.Sprintf("CLD\n")
+    case 0xe0:
+        out += fmt.Sprintf("CPX $%02x\n", immediateAddress(pc+1))
+        new_pc += 1
     case 0xea:
         out += fmt.Sprintf("NOP\n")
     case 0xee:
@@ -117,6 +142,8 @@ func Disassemble(cpu *Cpu, update bool) (new_pc uint16) {
     case 0xf0:
         out += fmt.Sprintf("BEQ $%02x\n", relativeAddress(pc+1))
         new_pc += 1
+    case 0xf8:
+        out += fmt.Sprintf("SED\n")
 	default:
 		out += fmt.Sprintf("Unknown: 0x%02x\n", opcode)
 	}

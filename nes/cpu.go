@@ -31,6 +31,10 @@ func (r *regs) getZeroFlag() bool {
 	return (r.status & 0x2) != 0
 }
 
+func (r *regs) getDecimalFlag() bool {
+	return (r.status & 0x8) != 0
+}
+
 func (r *regs) getOverflowFlag() bool {
     return (r.status & 0x40) != 0
 }
@@ -51,6 +55,10 @@ func (r *regs) setInterruptDisable() {
     r.status |= 0x4
 }
 
+func (r *regs) setDecimalFlag() {
+    r.status |= 0x8
+}
+
 func (r *regs) setOverflowFlag() {
     r.status |= 0x40
 }
@@ -67,7 +75,7 @@ func (r *regs) clearZeroFlag() {
 	r.status &= (0xff - 0x2)
 }
 
-func (r *regs) clearDecimalMode() {
+func (r *regs) clearDecimalFlag() {
     r.status &= (0xff - 0x8)
 }
 
@@ -86,8 +94,9 @@ type Cpu struct {
 
 func (c *Cpu) Init() (e error) {
 	log.Println("Initializing CPU...")
-    c.r.pc = 0x8000
+    c.r.pc = 0xc000
     c.r.sp = 0xff
+    c.r.status = 0x20
     
 	return
 }
@@ -148,7 +157,7 @@ func (c *Cpu) transfer(dstReg *uint8, srcReg uint8) {
     *dstReg = srcReg
 }
 
-func (c *Cpu) ldReg(addr uint16, reg *uint8) {
+func (c *Cpu) ldReg(reg *uint8, addr uint16) {
     *reg, _ = Ram.Read(addr)
 
     c.testAndSetZero(*reg)
@@ -165,6 +174,7 @@ func (c *Cpu) jump(addr uint16) {
 }
 
 func (c *Cpu) push(val uint8) {
+    //log.Printf("Pushing %02x\n", val)
     _ = Ram.Write(0x100 + uint16(c.r.sp), val)
     c.r.sp--
 }
@@ -172,6 +182,7 @@ func (c *Cpu) push(val uint8) {
 func (c *Cpu) pop() (val uint8) {
     c.r.sp++
     val, _ = Ram.Read(0x100 + uint16(c.r.sp))
+    //log.Printf("Poping  %02x\n", val)
     return
 }
 
@@ -198,12 +209,57 @@ func (c *Cpu) bitTest(addr uint16) {
     }
 }
 
+func (c *Cpu) doCmp(reg *uint8, addr uint16) {
+    val, _ := Ram.Read(addr)
+    if *reg >= val {
+        c.r.setCarryFlag()
+    } else {
+        c.r.clearCarryFlag()
+    }
+    result := *reg - val
+    c.testAndSetZero(result)
+    c.testAndSetSign(result)
+}
+
+func (c *Cpu) adc(addr uint16) {
+    val, _ := Ram.Read(addr)
+    var carry uint8
+    if c.r.getCarryFlag() {
+        carry = 1
+    } else {
+        carry = 0
+    }
+    result := (c.r.acc + carry + val)
+    if c.r.getDecimalFlag() {
+        // NOTE: Decimal mode unsupported on 2A03
+        //log.Println("ADC with Decimal mode unimplemented!")
+    }
+
+    if ((c.r.acc ^ val) & 0x80) == 0 && 
+            ((c.r.acc ^ result) & 0x80) != 0 {
+        c.r.setOverflowFlag()
+    } else {
+        c.r.clearOverflowFlag()
+    }
+    c.testAndSetZero(result)
+    c.testAndSetSign(result)
+    c.r.acc = result
+}
+
 func (c *Cpu) Step() (err error) {
     log.Printf("PC: 0x%04x\n", c.r.pc)
     opc, _ := Ram.Read(c.r.pc)
     c.r.pc += 1
+    // TODO: Consolidate math ins into a single function doMath()?
 
     switch opc {
+    case 0x08:  // PHP
+        c.push(c.r.status)
+    case 0x09:  // ORA IMM
+        val, _ := Ram.Read(c.immediateAddress())
+        c.r.acc |= val
+        c.testAndSetZero(c.r.acc)
+        c.testAndSetSign(c.r.acc)
     case 0x10:  // BPL
         rel := c.relativeAddress()
         if !c.r.getNegativeFlag() {
@@ -219,8 +275,27 @@ func (c *Cpu) Step() (err error) {
         c.jump(dst)
     case 0x24:  // BIT [ZPG]
         c.bitTest(c.zeroPageAddress())
+    case 0x28:  // PLP
+        c.r.status = c.pop()
+    case 0x29:  // AND IMM
+        val, _ := Ram.Read(c.immediateAddress())
+        c.r.acc &= val
+        c.testAndSetZero(c.r.acc)
+        c.testAndSetSign(c.r.acc)
+    case 0x30:  // BMI
+        rel := c.relativeAddress()
+        if c.r.getNegativeFlag() {
+            c.jump(c.r.pc + rel)
+        }
     case 0x38:  // SEC
         c.r.setCarryFlag()
+    case 0x48:  // PHA
+        c.push(c.r.acc)
+    case 0x49:  // EOR IMM
+        val, _ := Ram.Read(c.immediateAddress())
+        c.r.acc ^= val
+        c.testAndSetZero(c.r.acc)
+        c.testAndSetSign(c.r.acc)
     case 0x4c:  // JMP ABS
         c.jump(c.absoluteAddress())
     case 0x50:  // BVC
@@ -233,6 +308,12 @@ func (c *Cpu) Step() (err error) {
         tmph := c.pop()
         dst := uint16(tmph) << 8 | uint16(tmpl)
         c.jump(dst + 1)
+    case 0x68:  // PLA
+        c.r.acc = c.pop()
+        c.testAndSetZero(c.r.acc)
+        c.testAndSetSign(c.r.acc)
+    case 0x69:  // ADC
+        c.adc(c.immediateAddress())
     case 0x70:  // BVS
         rel := c.relativeAddress()
         if c.r.getOverflowFlag() {
@@ -253,24 +334,34 @@ func (c *Cpu) Step() (err error) {
         }
     case 0x9a:  // TXS
         c.transfer(&c.r.sp, c.r.x)
+    case 0xa0:  // LDY IMM
+        c.ldReg(&c.r.y, c.immediateAddress())
     case 0xa2:  // LDX IMM
-        c.ldReg(c.immediateAddress(), &c.r.x)
+        c.ldReg(&c.r.x, c.immediateAddress())
     case 0xa9:  // LDA IMM
-        c.ldReg(c.immediateAddress(), &c.r.acc)
+        c.ldReg(&c.r.acc, c.immediateAddress())
     case 0xad:  // LDA [ABS]
-        c.ldReg(c.absoluteAddress(), &c.r.acc)
+        c.ldReg(&c.r.acc, c.absoluteAddress())
     case 0xb0:  // BCS
         rel := c.relativeAddress()
         if c.r.getCarryFlag() {
             c.jump(c.r.pc + rel)
         }
+    case 0xb8:  // CLV
+        c.r.clearOverflowFlag()
+    case 0xc0:  // CPY IMM
+        c.doCmp(&c.r.y, c.immediateAddress())
+    case 0xc9:  // CMP IMM
+        c.doCmp(&c.r.acc, c.immediateAddress())
     case 0xd0:  // BNE
         rel := c.relativeAddress()
         if !c.r.getZeroFlag() {
             c.jump(c.r.pc + rel)
         }
     case 0xd8:  // CLD
-        c.r.clearDecimalMode()
+        c.r.clearDecimalFlag()
+    case 0xe0:  // CPX IMM
+        c.doCmp(&c.r.x, c.immediateAddress())
     case 0xea:  // NOP 
         break
     case 0xf0:  // BEQ
@@ -278,10 +369,12 @@ func (c *Cpu) Step() (err error) {
         if c.r.getZeroFlag() {
             c.jump(c.r.pc + rel)
         }
+    case 0xf8:  // SED
+        c.r.setDecimalFlag()
     default:
         log.Printf("Unimplemented opcode 0x%02x\n", opc)
         log.Fatalf("CPU State:\n%s\n", c)
     }
-    //log.Printf("CPU State:\n%s\n", c)
+    log.Printf("CPU State: %s\n", c)
     return
 }

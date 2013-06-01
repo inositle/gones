@@ -17,6 +17,7 @@ func (m *Memory) Init() {
 }
 
 func (m *Memory) Read(addr uint16) (b byte, err error) {
+    // TODO: Raise "exception" for invalid memory regions
     if addr >= 0x0 && addr <= 0xffff {
         b = m[addr]
     } else {
