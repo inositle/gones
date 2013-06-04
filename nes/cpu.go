@@ -89,12 +89,11 @@ func (r *regs) clearNegativeFlag() {
 
 type Cpu struct {
 	r regs
-    instrOpcodes []func()
 }
 
 func (c *Cpu) Init() (e error) {
 	log.Println("Initializing CPU...")
-    c.r.pc = 0xc000
+    c.r.pc = 0x8000
     c.r.sp = 0xff
     c.r.status = 0x20
     
@@ -150,6 +149,11 @@ func (c *Cpu) absoluteAddress() (result uint16) {
     high, _ := Ram.Read(c.r.pc + 1)
     result = (uint16(high) << 8) | uint16(low)
     c.r.pc += 2
+    return
+}
+
+func (c *Cpu) absoluteAddressX() (result uint16) {
+    result = c.absoluteAddress() + uint16(c.r.x)
     return
 }
 
@@ -246,7 +250,7 @@ func (c *Cpu) adc(addr uint16) {
     c.r.acc = result
 }
 
-func (c *Cpu) Step() (err error) {
+func (c *Cpu) Step() (cycles uint8, err error) {
     log.Printf("PC: 0x%04x\n", c.r.pc)
     opc, _ := Ram.Read(c.r.pc)
     c.r.pc += 1
@@ -254,28 +258,39 @@ func (c *Cpu) Step() (err error) {
 
     switch opc {
     case 0x08:  // PHP
+        cycles = 3
         c.push(c.r.status)
     case 0x09:  // ORA IMM
+        cycles = 2
         val, _ := Ram.Read(c.immediateAddress())
         c.r.acc |= val
         c.testAndSetZero(c.r.acc)
         c.testAndSetSign(c.r.acc)
     case 0x10:  // BPL
+        cycles = 2
         rel := c.relativeAddress()
         if !c.r.getNegativeFlag() {
+            cycles += 1
+            if c.r.pc & 0xff != (c.r.pc + rel) & 0xff {
+                cycles += 1
+            }
             c.jump(c.r.pc + rel)
         }
     case 0x18:  // CLC
+        cycles = 2
         c.r.clearCarryFlag()
     case 0x20:  // JSR
+        cycles = 6
         dst := c.absoluteAddress()
         tmp := c.r.pc - 1
         c.push(uint8(tmp >> 8))
         c.push(uint8(tmp & 0xff))
         c.jump(dst)
     case 0x24:  // BIT [ZPG]
+        cycles = 3
         c.bitTest(c.zeroPageAddress())
     case 0x28:  // PLP
+        cycles = 4
         c.r.status = c.pop()
     case 0x29:  // AND IMM
         val, _ := Ram.Read(c.immediateAddress())
@@ -349,6 +364,9 @@ func (c *Cpu) Step() (err error) {
         }
     case 0xb8:  // CLV
         c.r.clearOverflowFlag()
+    case 0xbd:  // LDA [ABS + X]
+        cycles = 4
+        c.ldReg(&c.r.acc, c.absoluteAddressX())
     case 0xc0:  // CPY IMM
         c.doCmp(&c.r.y, c.immediateAddress())
     case 0xc9:  // CMP IMM

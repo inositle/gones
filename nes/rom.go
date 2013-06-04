@@ -56,12 +56,12 @@ func (r *Rom) Init(infile string) error {
         r.RomBanks[i] = bank
 
         // Initialize RAM
-        copy(Ram[0x8000+i*0x4000:], bank)
+        copy(Ram.Raw[0x8000+i*0x4000:], bank)
     }
     if r.romBankCnt == 1 {
         r.RomBanks[1] = make([]byte, 0x4000)
         copy(r.RomBanks[1], r.RomBanks[0])
-        copy(Ram[0xc000:], r.RomBanks[1])
+        copy(Ram.Raw[0xc000:], r.RomBanks[1])
     }
 
     // Allocate and fille VROM banks

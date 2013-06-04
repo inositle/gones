@@ -8,7 +8,7 @@ import (
 )
 
 func absoluteAddress(pc uint16) (result uint16) {
-	buf := bytes.NewBuffer(Ram[pc : pc+2])
+	buf := bytes.NewBuffer(Ram.Raw[pc : pc+2])
 	binary.Read(buf, binary.LittleEndian, &result)
 	return
 }
@@ -20,7 +20,7 @@ func zeroPageAddress(pc uint16) (result uint16) {
 }
 
 func immediateAddress(pc uint16) (result uint8) {
-	buf := bytes.NewBuffer(Ram[pc : pc+1])
+	buf := bytes.NewBuffer(Ram.Raw[pc : pc+1])
 	binary.Read(buf, binary.LittleEndian, &result)
 	return
 }

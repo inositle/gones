@@ -12,6 +12,7 @@ var (
 
 	rom nes.Rom
 	cpu nes.Cpu
+	ppu nes.Ppu
 	apu nes.Apu
 )
 
@@ -28,6 +29,7 @@ func main() {
 
 	// Initialize hardware
 	cpu.Init()
+    ppu.Init()
 
 	// Load in ROM
 	if err := rom.Init(infile); err != nil {
@@ -43,7 +45,12 @@ func main() {
 	} else {
         for {
             nes.Disassemble(&cpu, false)
-            cpu.Step()
+            cycles, _ := cpu.Step()
+
+            for i := uint8(0); i < cycles * 3; i++ {
+                log.Printf("PPU State: %s", ppu)
+                ppu.Step()
+            }
         }
     }
 }
